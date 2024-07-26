@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <title>Babylon.js sample code</title>
+
+    <!-- Babylon.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+    <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+    <script src="https://cdn.babylonjs.com/recast.js"></script>
+    <script src="https://cdn.babylonjs.com/ammo.js"></script>
+    <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
+    <script src="https://cdn.babylonjs.com/cannon.js"></script>
+    <script src="https://cdn.babylonjs.com/Oimo.js"></script>
+    <script src="https://cdn.babylonjs.com/earcut.min.js"></script>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+    <script src="https://cdn.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+    <script src="https://cdn.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+    <style>
+      html,
+      body {
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      #renderCanvas {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+
+      #canvasZone {
+        width: 100%;
+        height: 100%;
+      }
+
+      #skelleton {
+        position: absolute;
+        top: 85vh;
+        left: 65vw;
+        font-size: 2em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        width: 15vh;
+        height: 10vh;
+        border-radius: 0.1em;
+        box-shadow: rgba(45, 35, 66, 0.4) 0 2px 4px,
+          rgba(45, 35, 66, 0.3) 0 7px 13px -3px, #d6d6e7 0 -3px 0 inset;
+      }
+
+      @media (max-width: 800px) {
+        #skelleton {
+          font-size: 2.5em;
+          top: 80vh;
+          left: 65vw;
+          /* background-color: aqua; */
+        }
+      }
+
+      #skelleton:focus {
+        box-shadow: #d6d6e7 0 0 0 1.5px inset, rgba(45, 35, 66, 0.4) 0 2px 4px,
+          rgba(45, 35, 66, 0.3) 0 7px 13px -3px, #d6d6e7 0 -3px 0 inset;
+      }
+
+      #skelleton:hover {
+        box-shadow: rgba(45, 35, 66, 0.4) 0 4px 8px,
+          rgba(45, 35, 66, 0.3) 0 7px 13px -3px, #d6d6e7 0 -3px 0 inset;
+        transform: translateY(-2px);
+      }
+
+      #skelleton:active {
+        box-shadow: #d6d6e7 0 3px 7px inset;
+        transform: translateY(2px);
+      }
+
+      #loader-container {
+        position: absolute;
+        display: flex;
+        width: 100vw;
+        height: 100vh;
+        align-items: center;
+        justify-content: center;
+        background-color: aliceblue;
+        z-index: 100;
+      }
+
+      .loader {
+        width: 50px;
+        height: 50px;
+        position: relative;
+      }
+      /* Spinner Animation */
+
+      .spinner {
+        border: 5px solid rgba(0, 0, 0, 0.1);
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loader-container">
+      <div class="loader spinner"></div>
+    </div>
+    <div id="canvasZone"><canvas id="renderCanvas"></canvas></div>
+    <button id="skelleton">Skeleton</button>
+    <script>
+      var canvas = document.getElementById("renderCanvas");
+
+      var startRenderLoop = function (engine, canvas) {
+        engine.runRenderLoop(function () {
+          if (sceneToRender && sceneToRender.activeCamera) {
+            sceneToRender.render();
+          }
+        });
+      };
+
+      var engine = null;
+      var scene = null;
+      var sceneToRender = null;
+      var createDefaultEngine = function () {
+        return new BABYLON.Engine(canvas, true, {
+          preserveDrawingBuffer: true,
+          stencil: true,
+          disableWebGL2Support: false,
+        });
+      };
+      var createScene = function () {
+        // This creates a basic Babylon Scene object (non-mesh)
+        var scene = new BABYLON.Scene(engine);
+
+        // This creates and positions a free camera (non-mesh)
+        const orbitCamera = new BABYLON.ArcRotateCamera(
+          "orbitCamera",
+          1.5,
+          1.3,
+          500,
+          new BABYLON.Vector3(0, 250, 0),
+          scene
+        );
+        orbitCamera.attachControl();
+        orbitCamera.panningSensibility *= 0.25;
+        orbitCamera.angularSensibilityX *= 2;
+        orbitCamera.angularSensibilityY *= 2;
+
+        // Constrain the camera to prevent clipping
+        orbitCamera.lowerBetaLimit = 0;
+        orbitCamera.lowerRadiusLimit = 350;
+        orbitCamera.upperBetaLimit = 1.4;
+        orbitCamera.upperRadiusLimit = 800;
+
+        orbitCamera.position = new BABYLON.Vector3(160, 400, -750);
+
+        var light = new BABYLON.HemisphericLight(
+          "light1",
+          new BABYLON.Vector3(0, 400, 0),
+          scene
+        );
+
+        light.intensity = 0.6;
+
+        var light2 = new BABYLON.HemisphericLight(
+          "light2",
+          new BABYLON.Vector3(0, 400, 0),
+          scene
+        );
+
+        light2.intensity = 0.2;
+
+        var greenMat = new BABYLON.StandardMaterial("greenMat", scene);
+        greenMat.emissiveColor = new BABYLON.Color3.FromHexString("#47C7EF");
+        greenMat.diffuseColor = new BABYLON.Color3.FromHexString("#47C7EF");
+        greenMat.ambientColor = new BABYLON.Color3.FromHexString("#47C7EF");
+        greenMat.roughness = 1;
+        console.log(greenMat);
+
+        let mat;
+
+        let skelletonOn = true;
+        let skelleton = null;
+
+        document
+          .getElementById("skelleton")
+          .addEventListener("click", function () {
+            skelletonOn = !skelletonOn;
+            console.log(orbitCamera.position);
+            skelletonVisibility();
+          });
+
+        function skelletonVisibility() {
+          for (let i = 0; i < skelleton.length; i++) {
+            if (!skelletonOn) {
+              skelleton[i].visibility = 0;
+            } else {
+              skelleton[i].visibility = 1;
+            }
+          }
+        }
+
+        var fadeOut = new BABYLON.StandardMaterial("fadeOut", scene);
+        fadeOut.diffuseTexture = new BABYLON.Texture(
+          "gradient_ramp_3.png",
+          scene
+        );
+
+        fadeOut.diffuseTexture.hasAlpha = true;
+        fadeOut.diffuseColor = new BABYLON.Color3.FromHexString("#f7fafa");
+
+        fadeOut.useAlphaFromDiffuseTexture = true;
+
+        var light1 = new BABYLON.DirectionalLight(
+          "light",
+          new BABYLON.Vector3(1, -1, 1),
+          scene
+        );
+        light1.position = new BABYLON.Vector3(-1, 600, -10);
+
+        light1.intensity = 1;
+        // light1.autoCalcShadowZBounds = true;
+        // light1.shadowMinZ = -5000;
+        // light1.shadowMaxZ = 1000;
+        // light1.shadowMaxZ = 130;
+        // light1.shadowMinZ = 10;
+
+        const shadowGenerator = new BABYLON.ShadowGenerator(5024, light1);
+
+        shadowGenerator.useContactHardeningShadow = true;
+        // shadowGenerator.setDarkness(0.5);
+        // light1.autoCalcShadowZBounds = true;
+
+        shadowGenerator.useBlurExponentialShadowMap = true;
+        shadowGenerator.transperencyShadow = true;
+
+        BABYLON.NodeMaterial.ParseFromSnippetAsync("FRHXQV#", scene).then(
+          (nodeMaterial) => {
+            mat = nodeMaterial;
+          }
+        );
+
+        let body = null;
+        // var box25 = BABYLON.MeshBuilder.CreateBox(
+        //   "box25",
+        //   {
+        //     size: 10,
+        //   },
+        //   scene
+        // );
+        // box25.position.y = 30;
+        // box25.position.z = 20;
+        // shadowGenerator.addShadowCaster(box25);
+
+        // var box23 = BABYLON.MeshBuilder.CreateBox(
+        //   "box23",
+        //   {
+        //     size: 10,
+        //   },
+        //   scene
+        // );
+        // box23.position.y = 30;
+        // box23.position.z = 80;
+        // shadowGenerator.addShadowCaster(box23);
+
+        // var box251 = BABYLON.MeshBuilder.CreateBox(
+        //   "box251",
+        //   {
+        //     size: 10,
+        //   },
+        //   scene
+        // );
+        // box251.position.y = 30;
+        // box251.position.z = -40;
+        // shadowGenerator.addShadowCaster(box251);
+
+        BABYLON.SceneLoader.ImportMesh(
+          "",
+          "",
+          "bacac -70.glb",
+          scene,
+          (meshes, particleSystem, skeleton, animationGroups) => {
+            meshes[0].scaling = new BABYLON.Vector3(-240, 240, 240);
+
+            meshes[0].rotation = new BABYLON.Vector3(0, 0, 0);
+            meshes[0].position.y = 0;
+            meshes[0].position.z = -220;
+            for (let i = 0; i < meshes.length; i++) {
+              shadowGenerator.addShadowCaster(meshes[i]);
+              meshes[i].receiveShadows = true;
+              // meshes[i].renderingGroupId = 2;
+            }
+            // shadowGenerator.addShadowCaster(meshes[0]);
+            // meshes[0].receiveShadows = true;
+            body = meshes;
+
+            animationGroups[0].stop();
+
+            animationGroups[0].start(true, 1, 1, 2998);
+            console.log(animationGroups[0]);
+          }
+        );
+        let ball = null;
+
+        BABYLON.SceneLoader.ImportMesh(
+          "",
+          "",
+          "disk -70.glb",
+          scene,
+          (meshes, particleSystem, skeleton, animationGroups) => {
+            meshes[0].scaling = new BABYLON.Vector3(-240, 240, 240);
+
+            meshes[0].rotation = new BABYLON.Vector3(0, 0, 0);
+            meshes[0].position.y = 0;
+            meshes[0].position.z = -220;
+
+            for (let i = 0; i < meshes.length; i++) {
+              shadowGenerator.addShadowCaster(meshes[i]);
+              meshes[i].receiveShadows = true;
+              // meshes[i].renderingGroupId = 1;
+            }
+
+            // shadowGenerator.addShadowCaster(meshes[0]);
+            // meshes[0].receiveShadows = true;
+            ball = meshes;
+
+            animationGroups[0].stop();
+
+            animationGroups[0].start(true, 1, 1, 2998);
+            console.log(animationGroups);
+          }
+        );
+        // setInterval(() => {
+        //   console.log(orbitCamera);
+        // }, 2000);
+
+        var ground = BABYLON.MeshBuilder.CreateGround(
+          "ground",
+          {
+            width: 1600,
+            height: 1600,
+          },
+          scene
+        );
+        ground.position.y = -35;
+
+        ground.receiveShadows = true;
+        ground.material = fadeOut;
+        shadowGenerator.addShadowCaster(ground);
+
+        BABYLON.SceneLoader.ImportMesh(
+          "",
+          "",
+          "kostur-70.glb",
+          scene,
+          (meshes, particleSystem, skeleton, animationGroups) => {
+            meshes[0].scaling = new BABYLON.Vector3(-240, 240, 240);
+
+            meshes[0].rotation = new BABYLON.Vector3(0, 0, 0);
+            meshes[0].position.y = 0;
+            meshes[0].position.z = -220;
+
+            for (let i = 0; i < meshes.length; i++) {
+              meshes[i].renderingGroupId = 3;
+              meshes[i].material = greenMat;
+              light.excludedMeshes.push(meshes[i]);
+              light1.excludedMeshes.push(meshes[i]);
+            }
+
+            animationGroups[0].stop();
+
+            animationGroups[0].start(true, 1, 1, 2998);
+            console.log(animationGroups);
+
+            skelleton = meshes;
+          }
+        );
+
+        BABYLON.SceneLoader.ImportMesh(
+          "",
+          "",
+          "Interior 70.glb",
+          scene,
+          (meshes, particleSystem, skeleton, animationGroups) => {
+            meshes[0].scaling = new BABYLON.Vector3(80, 80, 80);
+            console.log(meshes);
+            meshes[0].position.y = 470;
+
+            // meshes[0].rotation = new BABYLON.Vector3(0, -Math.PI / 2, 0);
+          }
+        );
+
+        let t = 0;
+
+        scene.onBeforeRenderObservable.add(() => {
+          if (skelleton != null && body != null) {
+            t++;
+            if (t == 20) {
+              document.getElementById("loader-container").style.display =
+                "none";
+            }
+          }
+        });
+        return scene;
+      };
+      window.initFunction = async function () {
+        var asyncEngineCreation = async function () {
+          try {
+            return createDefaultEngine();
+          } catch (e) {
+            console.log(
+              "the available createEngine function failed. Creating the default engine instead"
+            );
+            return createDefaultEngine();
+          }
+        };
+
+        window.engine = await asyncEngineCreation();
+        if (!engine) throw "engine should not be null.";
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();
+      };
+      initFunction().then(() => {
+        sceneToRender = scene;
+      });
+
+      // Resize
+      window.addEventListener("resize", function () {
+        engine.resize();
+      });
+    </script>
+  </body>
+</html>
